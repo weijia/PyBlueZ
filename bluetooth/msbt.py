@@ -1,12 +1,12 @@
-from btcommon import *
-import _msbt as bt
+from bluetooth import *
+import bluetooth._msbt as bt
 
 bt.initwinsock ()
 
 # ============== SDP service registration and unregistration ============
 
-def discover_devices (duration=8, flush_cache=True, lookup_names=False):
-    return bt.discover_devices (flush_cache, lookup_names)
+def discover_devices (duration=8, flush_cache=True, lookup_names=False, lookup_class=False):
+    return bt.discover_devices (flush_cache, lookup_names, lookup_class)
 
 def lookup_name (address, timeout=10):
     if not is_valid_address (address): 
@@ -93,7 +93,7 @@ class BluetoothSocket:
 
     def makefile (self):
         # TODO
-        raise "Not yet implemented"
+        raise Exception("Not yet implemented")
 
 
 def advertise_service (sock, name, service_id = "", service_classes = [], \

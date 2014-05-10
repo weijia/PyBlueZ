@@ -1,6 +1,9 @@
 import sys
 import os
-from btcommon import *
+if sys.version < '3':
+    from .btcommon import *
+else:
+    from bluetooth.btcommon import *
 
 __version__ = 0.19
 
@@ -18,11 +21,11 @@ if sys.platform == "win32":
        os.path.exists (os.path.join (sysroot, "system32", dll)) or \
        os.path.exists (os.path.join (sysroot, dll)):
         try:
-            import widcomm
+            from . import widcomm
             if widcomm.inquirer.is_device_ready ():
                 # if the Widcomm stack is active and a Bluetooth device on that
                 # stack is detected, then use the Widcomm stack
-                from widcomm import *
+                from .widcomm import *
                 have_widcomm = True
         except ImportError: 
             pass
@@ -30,12 +33,20 @@ if sys.platform == "win32":
     if not have_widcomm:
         # otherwise, fall back to the Microsoft stack
         _dbg("Widcomm not ready. falling back to MS stack")
-        from msbt import *
+        if sys.version < '3':
+            from .msbt import *
+        else:
+            from bluetooth.msbt import *
 
-elif sys.platform == "linux2":
-    from bluez import *
+elif sys.platform.startswith("linux"):
+    if sys.version < '3':
+        from .bluez import *
+    else:
+        from bluetooth.bluez import *
 elif sys.platform == "darwin":
-    from osx import *
+    from .osx import *
+else:
+    raise Exception("This platform (%s) is currently not supported by pybluez." % sys.platform)
 
 discover_devices.__doc__ = \
     """
@@ -48,6 +59,8 @@ discover_devices.__doc__ = \
     lookup_names=False
         if set to True, then discover_devices also attempts to lookup the
         display name of each detected device.
+
+    if lookup_class is True, the class of the device is added to the tuple
     """
 
 lookup_name.__doc__ = \

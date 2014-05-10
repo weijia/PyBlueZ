@@ -5,6 +5,8 @@
 #include <Python.h>
 
 #include <initguid.h>
+#include <port3.h>
+
 
 #if 1
 static void dbg(const char *fmt, ...)
@@ -392,6 +394,7 @@ msbt_discover_devices(PyObject *self, PyObject *args)
 {
     int flushcache = 0;
     int lookupnames = 0;
+    int lookupclass = 0;
 
 	// inquiry data structure
 	DWORD qs_len = sizeof( WSAQUERYSET );
@@ -405,19 +408,20 @@ msbt_discover_devices(PyObject *self, PyObject *args)
 
     dbg("msbt_discover_devices\n");
 
-    if(!PyArg_ParseTuple(args, "ii", &flushcache, &lookupnames)) {
+    if(!PyArg_ParseTuple(args, "iii", &flushcache, &lookupnames, &lookupclass)) {
         free( qs );
         return 0;
     }
 
     if (flushcache) flushcache = LUP_FLUSHCACHE;
     if (lookupnames) lookupnames = LUP_RETURN_NAME;
+    if (lookupclass) lookupclass = LUP_RETURN_TYPE;
 
 	ZeroMemory( qs, qs_len );
 	qs->dwSize = sizeof(WSAQUERYSET);
 	qs->dwNameSpace = NS_BTH;
 
-	flags |= flushcache | lookupnames | LUP_RETURN_ADDR;
+	flags |= flushcache | lookupnames | lookupclass | LUP_RETURN_ADDR;
 
 	Py_BEGIN_ALLOW_THREADS;
 	// start the device inquiry
@@ -456,9 +460,13 @@ msbt_discover_devices(PyObject *self, PyObject *args)
 				((SOCKADDR_BTH*)qs->lpcsaBuffer->RemoteAddr.lpSockaddr)->btAddr;
             ba2str( result, buf );
 
-            if( lookupnames ) {
+			if( lookupnames && lookupclass ) {
+                tup = Py_BuildValue( "ssl", buf, qs->lpszServiceInstanceName, qs->lpServiceClassId->Data1 );
+			} else if( lookupnames ) {
                 tup = Py_BuildValue( "ss", buf, qs->lpszServiceInstanceName );
-            } else {
+			} else if (lookupclass) {
+                tup = Py_BuildValue( "sl", buf, qs->lpServiceClassId->Data1 );
+			} else {
                 tup = PyString_FromString (buf);
             }
             PyList_Append( toreturn, tup );
@@ -921,16 +929,41 @@ static PyMethodDef msbt_methods[] = {
 
 PyDoc_STRVAR(msbt_doc, "TODO\n");
 
+#define ADD_INT_CONSTANT(m,a) PyModule_AddIntConstant(m, #a, a)
+
+#if PY_MAJOR_VERSION < 3
 PyMODINIT_FUNC
 init_msbt(void)
 {
-    PyObject *m;
-
-    m = Py_InitModule3("_msbt", msbt_methods, msbt_doc);
-
-#define ADD_INT_CONSTANT(m,a) PyModule_AddIntConstant(m, #a, a)
+    PyObject * m = Py_InitModule3("_msbt", msbt_methods, msbt_doc);
 
     ADD_INT_CONSTANT(m, SOCK_STREAM);
     ADD_INT_CONSTANT(m, BTHPROTO_RFCOMM);
     ADD_INT_CONSTANT(m, BT_PORT_ANY);
 }
+#else
+PyMODINIT_FUNC
+PyInit__msbt(void)
+{
+    PyObject *m;
+
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "_msbt",
+        NULL,
+        -1,
+        msbt_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    };
+    m = PyModule_Create(&moduledef);
+#define ADD_INT_CONSTANT(m,a) PyModule_AddIntConstant(m, #a, a)
+
+    ADD_INT_CONSTANT(m, SOCK_STREAM);
+    ADD_INT_CONSTANT(m, BTHPROTO_RFCOMM);
+    ADD_INT_CONSTANT(m, BT_PORT_ANY);
+    return m;
+}
+#endif

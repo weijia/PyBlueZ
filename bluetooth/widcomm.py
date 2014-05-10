@@ -1,4 +1,4 @@
-from btcommon import *
+from .btcommon import *
 import socket
 import struct
 import threading
@@ -106,7 +106,7 @@ class WCInquirer:
 
 inquirer = WCInquirer ()
 
-def discover_devices (duration=8, flush_cache=True, lookup_names=False):
+def discover_devices (duration=8, flush_cache=True, lookup_names=False, lookup_class=False):
     inquirer.start_inquiry ()
 
     while inquirer.inquiry_in_progress:
@@ -114,9 +114,9 @@ def discover_devices (duration=8, flush_cache=True, lookup_names=False):
 
     discovered = inquirer.recently_discovered[:]
 
-    if not lookup_names:
+    if not lookup_names and not lookup_class:
         return [ tup[0] for tup in discovered ]
-    if lookup_names:
+    if lookup_names and not lookup_class:
         result = []
         for bdaddr, devClass, bdName, bConnected in discovered:
             if bdName:
@@ -124,7 +124,24 @@ def discover_devices (duration=8, flush_cache=True, lookup_names=False):
             else:
                 result.append ((bdAddr, None))
         return result
-
+    if not lookup_names and lookup_class:
+        result = []
+        for bdaddr, devClass, bdName, bConnected in discovered:
+            hex = "%02X%02X%02X" % (ord(devClass[0]), ord(devClass[1]), ord(devClass[2]))
+            devClass = int(hex, 16)
+            result.append ((bdAddr, devClass))
+        return result
+    if lookup_names and lookup_class:
+        result = []
+        for bdaddr, devClass, bdName, bConnected in discovered:
+            hex = "%02X%02X%02X" % (ord(devClass[0]), ord(devClass[1]), ord(devClass[2]))
+            devClass = int(hex, 16)
+            if bdName:
+                result.append ((bdaddr, bdName, devClass))
+            else:
+                result.append ((bdAddr, None, devClass))
+        return result
+       
 def lookup_name (address, timeout=10):
     discover_devices ()
     for bdaddr, devClass, bdName, bConnected in inquirer.recently_discovered:
@@ -200,7 +217,7 @@ def _port_ev_code_to_str (code):
           _widcomm.PORT_EV_FC : "Flow control enabled flag changed by remote",
           _widcomm.PORT_EV_FCS : "Flow control status true = enabled" }
     result = []
-    for k, v in d.items ():
+    for k, v in list(d.items ()):
         if code & k:
             result.append (v)
     if len (result) == 0:
